@@ -707,13 +707,12 @@ const BlindSynth = {
       osc.connect(g); g.connect(b); osc.start(t); osc.stop(t+dur+0.02); this.morseNodes.push(osc); t+=dur;
     };
     const letters=word.toUpperCase().split('');
-    for(let rep=0;rep<2;rep++){
+    for(let rep=0;rep<1;rep++){
       letters.forEach((ch,li)=>{
         const code=MORSE[ch]||'';
         for(let i=0;i<code.length;i++){ beep(code[i]==='.'?u:u*3); if(i<code.length-1) t+=u; }
         if(li<letters.length-1) t+=u*4;
       });
-      t+=u*12;
     }
     this.morseEnd = t - c.currentTime;
   },
@@ -1889,7 +1888,7 @@ ModReg.morse = class extends Mod {
     for(let i=0;i<6;i++) this.f(this.q('#mh'+i),'c'+i,{press:()=>this.step(i,1),rotate:d=>this.step(i,d)});
     this.f(this.q('#okh'),'ok',{press:()=>this.ok()});
   }
-  speak(){ Sfx.p('press'); const w=this.q('#spkw'); w.classList.add('wave'); Blind.morse(this.word.toLowerCase(),0.45); this._wv=setTimeout(()=>w.classList.remove('wave'),(this.word.length*2*16+30)*0.45*1000); }
+  speak(){ Sfx.p('press'); const w=this.q('#spkw'); w.classList.add('wave'); Blind.morse(this.word.toLowerCase(),0.5); this._wv=setTimeout(()=>w.classList.remove('wave'),(this.word.length*16+10)*0.5*1000); }
   step(i,d){ this.sel[i]=(this.sel[i]+d+26)%26; this.q('#ml'+i).textContent=String.fromCharCode(65+this.sel[i]); Sfx.p('flip'); }
   guess(){ return this.sel.map(v=>String.fromCharCode(65+v)).join(''); }
   ok(){ Sfx.p('press'); if(this.guess()===this.word) this.solve(); else this.strike('morse'); }
