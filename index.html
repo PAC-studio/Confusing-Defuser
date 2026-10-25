@@ -2,7 +2,7 @@
 <html lang="th"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
-<title>Confusing Defuser · รวมกันเราอยู่ แยกหมู่เราระเบิด!</title>
+<title>Confusing Defuser · สับสน งงงวย ช่วยกันกู้ระเบิด</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap">
 <style>:root{--cell:300px;--fw:900px;--fh:600px;--amber:#ffb02e;--cy:#59e0ff;--bg:#06080a}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
@@ -2644,7 +2644,7 @@ const Game = {
   },
   s_title(el){
     const pad=Input.padConnected;
-    el.innerHTML=`<div class="logo">CONFUSING<br>DEFUSER<small>รวมกันเราอยู่ แยกหมู่เราระเบิด!</small></div><div class="tagline">3 คน · 1 ระเบิด · ไม่มีใครทำงานครบทุกประสาท</div><div class="menu"></div>
+    el.innerHTML=`<div class="logo">CONFUSING<br>DEFUSER<small>สับสน งงงวย ช่วยกันกู้ระเบิด</small></div><div class="tagline">3 คน · 1 ระเบิด · ไม่มีใครทำงานครบทุกประสาท</div><div class="menu"></div>
       <div class="hint">${pad?'🎮 ตรวจพบจอยแล้ว':'ยังไม่พบจอย — ใช้คีย์บอร์ด/สัมผัสแทนได้'} &nbsp; <b>A</b> เลือก &nbsp;<b>B</b> ย้อน</div>`;
     const m=$('.menu',el);
     m.append(this.btn('▶ เริ่มเกม',()=>this.go('diff'),'primary','start'),this.btn('🎧 เชื่อมต่อโทรศัพท์ (เสียงคนตาบอด)',()=>this.go('setup'),'','setup'),
