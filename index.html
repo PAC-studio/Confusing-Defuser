@@ -680,7 +680,7 @@ const BlindSynth = {
         Speak.cancel(); Speak.sayWords(m.w||[],m.gap);
         break; }
       case 'pre': Speak.preload(m.w); break;
-      case 'morse': this.morse(m.w, m.u||0.16); break;
+      case 'morse': Aud.resume(); this.morse(m.w, m.u||0.16); break;
       case 'click': {
         const t=Aud.now();
         if(m.v==='sharp'){ // คลิกล็อก: ก๊อก-ก๊อก นุ่ม ๆ
@@ -697,7 +697,9 @@ const BlindSynth = {
   },
   morse(word, u){
     this.stopMorse();
-    const c=Aud.ctx; let t=c.currentTime+0.15; const b=Aud.blindBus;
+    try{ Speak.cancel(); if(Speak.pl){ Speak.pl.removeAttribute('src'); Speak.pl.load(); } }catch(e){}
+    Aud.resume();
+    const c=Aud.ctx; let t=c.currentTime+0.4; const b=Aud.blindBus;
     const f=640;
     const beep=(dur)=>{
       const osc=c.createOscillator(), g=c.createGain(); osc.type='sine'; osc.frequency.value=f;
@@ -1887,7 +1889,7 @@ ModReg.morse = class extends Mod {
     for(let i=0;i<6;i++) this.f(this.q('#mh'+i),'c'+i,{press:()=>this.step(i,1),rotate:d=>this.step(i,d)});
     this.f(this.q('#okh'),'ok',{press:()=>this.ok()});
   }
-  speak(){ Sfx.p('press'); const w=this.q('#spkw'); w.classList.add('wave'); Blind.morse(this.word.toLowerCase(),0.3); this._wv=setTimeout(()=>w.classList.remove('wave'),(this.word.length*2*16+30)*0.3*1000); }
+  speak(){ Sfx.p('press'); const w=this.q('#spkw'); w.classList.add('wave'); Blind.morse(this.word.toLowerCase(),0.45); this._wv=setTimeout(()=>w.classList.remove('wave'),(this.word.length*2*16+30)*0.45*1000); }
   step(i,d){ this.sel[i]=(this.sel[i]+d+26)%26; this.q('#ml'+i).textContent=String.fromCharCode(65+this.sel[i]); Sfx.p('flip'); }
   guess(){ return this.sel.map(v=>String.fromCharCode(65+v)).join(''); }
   ok(){ Sfx.p('press'); if(this.guess()===this.word) this.solve(); else this.strike('morse'); }
