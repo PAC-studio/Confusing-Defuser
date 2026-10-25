@@ -1693,8 +1693,8 @@ ModReg.simon = class extends Mod {
   }
   leds(){ for(let i=0;i<4;i++) this.q('#sl'+i).classList.toggle('on',i<this.stage-1); }
   speak(){
-    Sfx.p('press'); this.q('#spkw').classList.add('wave'); setTimeout(()=>this.q('#spkw').classList.remove('wave'),this.stage*1600);
-    Blind.words(this.words.slice());
+    Sfx.p('press'); this.q('#spkw').classList.add('wave'); setTimeout(()=>this.q('#spkw').classList.remove('wave'),1600);
+    Blind.words([this.words[this.stage-1]]);
   }
   hit(c){
     Sfx.p('press');
@@ -2010,8 +2010,7 @@ ModReg.pressure = class extends Mod {
     const nv=clamp(old+d*stp,0,150); if(nv===old) return;
     this.dial=nv;
     const crossed=(old<this.c&&nv>=this.c)||(old>this.c&&nv<=this.c)||nv===this.c;
-    Sfx.p('flip');
-    if(crossed){ this.revealed=true; Blind.click('sharp'); Sfx.p('led'); } else Blind.click('soft');
+    if(crossed){ this.revealed=true; Blind.click('sharp'); } else Blind.click('soft');
     this.draw();
   }
   draw(){
