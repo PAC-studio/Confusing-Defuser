@@ -484,8 +484,8 @@ const Aud = {
     if(!AC) return false;
     try{ this.ctx = new AC({latencyHint:'interactive'}); }catch(e){ this.ctx = new AC(); }
     const c = this.ctx;
-    this.master = c.createGain(); this.master.gain.value = 1;
-    const comp = c.createDynamicsCompressor(); comp.threshold.value=-14; comp.ratio.value=6;
+    this.master = c.createGain(); this.master.gain.value = 2.2;
+    const comp = c.createDynamicsCompressor(); comp.threshold.value=-10; comp.ratio.value=8; comp.knee.value=12;
     const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=4800; lp.Q.value=0.5; this.master.connect(comp); comp.connect(lp); lp.connect(c.destination);
     this.mainBus = c.createGain(); this.mainBus.gain.value = this.vol; this.mainBus.connect(this.master);
     this.blindBus = c.createGain(); this.blindBus.gain.value = this.blindVol; this.blindBus.connect(this.master);
@@ -621,7 +621,11 @@ const Speak = {
   /* ลองหลายแหล่งตามลำดับ: เสียงพจนานุกรมของ Google (ไฟล์สถิตบน gstatic) -> Google Translate TTS -> เสียงอ่านของเครื่อง */
   good:(()=>{ try{ return JSON.parse(localStorage.getItem('bd_good')||'{}'); }catch(e){ return {}; } })(),
   srcs(w){ const lw=w.toLowerCase(), pad=(n)=>(lw.slice(0,n)+'_____').slice(0,n);
-    return [['cambridge',`https://dictionary.cambridge.org/media/english/us_pron/${lw[0]}/${pad(3)}/${pad(5)}/${lw}.mp3`]]; },
+    return [['cambridge',`https://dictionary.cambridge.org/media/english/us_pron/${lw[0]}/${pad(3)}/${pad(5)}/${lw}.mp3`],
+            ['oxford',`https://www.oxfordlearnersdictionaries.com/media/english/us_pron/${lw[0]}/${pad(3)}/${pad(5)}/${lw}__us_1.mp3`]]; },
+  _pre:{},
+  /* โหลดไฟล์เสียงล่วงหน้าให้เบราว์เซอร์เก็บไว้ (cache) แล้วค่อยเล่นตามที่สุ่มได้ */
+  preload(ws){ (ws||[]).forEach(w=>{ if(this._pre[w]) return; this._pre[w]=this.srcs(w).map(([n,u])=>{ try{ const a=new Audio(); a.preload='auto'; a.src=u; a.load(); return a; }catch(e){ return null; } }); }); },
   tryClip(w,url){
     return new Promise(res=>{
       const a=this.ensurePlayer(); let done=false, started=false; const tok=a._tok=(a._tok||0)+1, mine=()=>a._tok===tok;
@@ -646,12 +650,10 @@ const Speak = {
       why.push(name+':'+r.why);
     }
     if(run!==this.wrun) return;
-    this.setStat(w+': Cambridge ไม่ได้ ('+why.join(',')+') ใช้เสียงเครื่อง');
-    await this.say(w,'en',0.6);
+    this.setStat(w+': เล่นไม่ได้ ('+why.join(',')+')');
   },
   busy:false,
   async sayWords(ws,gap){ const run=++this.wrun; this.busy=true; for(const w of ws){ if(run!==this.wrun) return; await this.playWord(w,run); await new Promise(r=>setTimeout(r,gap||350)); } if(run===this.wrun) this.busy=false; },
-  preload(ws){},
   cancel(){ this.wrun++; this.busy=false; try{ if(this.pl) this.pl.pause(); }catch(e){} this.timers.forEach(clearTimeout); this.timers=[]; if(this.ok){ try{ speechSynthesis.cancel(); }catch(e){} } }
 };
 const TH_DIGITS = ['ศูนย์','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'];
@@ -668,7 +670,8 @@ const BlindSynth = {
         let text = m.t, lang = m.l || 'en';
         if(m.d != null){ // ตัวเลข
           lang = (Speak.digitsLang==='th' && Speak.has('th')) ? 'th' : 'en';
-          text = lang==='th' ? TH_DIGITS[m.d] : EN_DIGITS[m.d];
+          if(lang==='en'){ this.lastSay=Speak.playWord(EN_DIGITS[m.d],Speak.wrun); break; }
+          text = TH_DIGITS[m.d]; if(m.d===7&&!m.r) m.r=0.6;
         }
         this.lastSay=Speak.say(text, lang, m.r);
         break; }
@@ -676,6 +679,7 @@ const BlindSynth = {
         { const key=(m.w||[]).join(','), now=Date.now(); if(this._lw===key&&(now-this._lwT<500||Speak.busy)){ break; } this._lw=key; this._lwT=now; }
         Speak.cancel(); Speak.sayWords(m.w||[],m.gap);
         break; }
+      case 'pre': Speak.preload(m.w); break;
       case 'morse': this.morse(m.w, m.u||0.16); break;
       case 'click': {
         const t=Aud.now();
@@ -701,11 +705,14 @@ const BlindSynth = {
       osc.connect(g); g.connect(b); osc.start(t); osc.stop(t+dur+0.02); this.morseNodes.push(osc); t+=dur;
     };
     const letters=word.toUpperCase().split('');
-    letters.forEach((ch,li)=>{
-      const code=MORSE[ch]||'';
-      for(let i=0;i<code.length;i++){ beep(code[i]==='.'?u:u*3); if(i<code.length-1) t+=u; }
-      if(li<letters.length-1) t+=u*3;
-    });
+    for(let rep=0;rep<2;rep++){
+      letters.forEach((ch,li)=>{
+        const code=MORSE[ch]||'';
+        for(let i=0;i<code.length;i++){ beep(code[i]==='.'?u:u*3); if(i<code.length-1) t+=u; }
+        if(li<letters.length-1) t+=u*4;
+      });
+      t+=u*12;
+    }
     this.morseEnd = t - c.currentTime;
   },
   stopMorse(){ this.morseNodes.forEach(o=>{ try{o.stop()}catch(e){} }); this.morseNodes=[]; },
@@ -752,6 +759,7 @@ const Blind = {
   sayWait(d){ const remote=Link.connected(); BlindSynth.lastSay=null; this.send({k:'say',d}); const est=sleep(1600);
     if(remote&&!this.alsoLocal) return est; const l=BlindSynth.lastSay; return l?Promise.all([l,sleep(700)]):est; },
   words(w){ this.send({k:'words',w}); },
+  preload(w){ this.send({k:'pre',w}); },
   morse(w,u){ this.send({k:'morse',w,u}); },
   click(v){ this.send({k:'click',v}); },
   tick(f){ this.send({k:'tick',f}); },
@@ -1188,7 +1196,7 @@ class Mod {
   /* แถว LED แสดงความคืบหน้า (โมดูลที่ต้องทำหลายรอบ) */
   progMarkup(n,cx,y,gap=5.2,r=1.7){ this._pn=n; let o=''; for(let i=0;i<n;i++) o+=`<circle id="pg${i}" class="sled2" cx="${cx+(i-(n-1)/2)*gap}" cy="${y}" r="${r}"/>`; return o; }
   setProg(k){ for(let i=0;i<(this._pn||0);i++){ const e=this.q('#pg'+i); if(e) e.classList.toggle('on',i<k); } }
-  okStep(){ Sfx.p('led'); this.led.classList.remove('okb'); void this.led.offsetWidth; this.led.classList.add('okb'); clearTimeout(this._okT); this._okT=setTimeout(()=>this.led.classList.remove('okb'),1500); }
+  okStep(){ Sfx.p('led'); Blind.beep(1320,0.12); this.led.classList.remove('okb'); void this.led.offsetWidth; this.led.classList.add('okb'); clearTimeout(this._okT); this._okT=setTimeout(()=>this.led.classList.remove('okb'),1500); }
   onInput(ev){ return false; }
   /* ใช้ทดสอบ */
   info(){ return {}; }
@@ -1606,10 +1614,10 @@ ModReg.direction = class extends Mod {
   constructor(b,i,t){
     super(b,i,t);
     this.round=0; this.playing=false; this.startCnt=0; this.inp=0; this.started=false;
-    this.newSeq(); this.build();
+    this.newSeq(); this.build(); Blind.preload(EN_DIGITS);
   }
   newSeq(){
-    const n=R.int(3,6); this.seq=[]; for(let k=0;k<n;k++){ let ci; do{ ci=R.int(0,3); }while(k&&ci===this.seq[k-1].ci); this.seq.push({ci,d:R.int(0,9)}); }
+    const n=(()=>{ const r=Math.random()*100; return r<15?1:r<40?2:r<70?3:r<90?4:5; })(); this.seq=[]; for(let k=0;k<n;k++){ let ci; do{ ci=R.int(0,3); }while(k&&ci===this.seq[k-1].ci); this.seq.push({ci,d:R.int(0,9)}); }
     this.startCnt=0; this.inp=0; this.started=false;
   }
   arrowFor(e){ return DIR_TABLE[e.d][e.ci]; }
@@ -1669,7 +1677,7 @@ ModReg.simon = class extends Mod {
     super(b,i,t);
     this.stage=1; this.inp=0; this.newWords(); this.build();
   }
-  newWords(){ this.words=this.words||[]; while(this.words.length<this.stage){ const c=R.pick(SIMON_COLORS), w=R.pick(SIMON_WORDS[c]); if(!this.words.includes(w)) this.words.push(w); } }
+  newWords(){ this.words=this.words||[]; while(this.words.length<4){ const c=R.pick(SIMON_COLORS), w=R.pick(SIMON_WORDS[c]); if(!this.words.includes(w)) this.words.push(w); } Blind.preload(this.words.slice()); }
   sector(a1,a2,R_,r0,cx,cy){
     const P=(a,r)=>[cx+r*Math.cos(a*Math.PI/180),cy+r*Math.sin(a*Math.PI/180)].map(v=>v.toFixed(2)).join(',');
     return `M${P(a1,r0)} L${P(a1,R_)} A${R_},${R_} 0 0 1 ${P(a2,R_)} L${P(a2,r0)} A${r0},${r0} 0 0 0 ${P(a1,r0)}Z`;
@@ -1701,10 +1709,10 @@ ModReg.simon = class extends Mod {
     const e=this.q('#q-'+c); e.classList.remove('lit'); void e.getBoundingClientRect(); e.classList.add('lit'); setTimeout(()=>e.classList.remove('lit'),260);
     if(c===simonColorOf(this.words[this.inp])){
       this.inp++;
-      if(this.inp>=this.stage){ this.stage++; this.inp=0; this.okStep(); this.leds(); if(this.stage>4){ this.solve(); } else this.newWords(); }
+      if(this.inp>=this.stage){ this.stage++; this.inp=0; this.okStep(); this.leds(); if(this.stage>4){ this.solve(); } }
     } else { this.inp=0; this.strike('simon'); }
   }
-  info(){ return {words:this.words,colors:this.words.map(simonColorOf),stage:this.stage,inp:this.inp}; }
+  info(){ const ws=this.words.slice(0,this.stage); return {words:ws,colors:ws.map(simonColorOf),stage:this.stage,inp:this.inp}; }
 };
 
 /* ====================== 6) เมทริกซ์ ====================== */
@@ -1879,7 +1887,7 @@ ModReg.morse = class extends Mod {
     for(let i=0;i<6;i++) this.f(this.q('#mh'+i),'c'+i,{press:()=>this.step(i,1),rotate:d=>this.step(i,d)});
     this.f(this.q('#okh'),'ok',{press:()=>this.ok()});
   }
-  speak(){ Sfx.p('press'); const w=this.q('#spkw'); w.classList.add('wave'); setTimeout(()=>w.classList.remove('wave'),9000); Blind.morse(this.word.toLowerCase(),0.2); this._wv=setTimeout(()=>w.classList.remove('wave'),(this.word.length*6+8)*0.2*1000); }
+  speak(){ Sfx.p('press'); const w=this.q('#spkw'); w.classList.add('wave'); Blind.morse(this.word.toLowerCase(),0.3); this._wv=setTimeout(()=>w.classList.remove('wave'),(this.word.length*2*16+30)*0.3*1000); }
   step(i,d){ this.sel[i]=(this.sel[i]+d+26)%26; this.q('#ml'+i).textContent=String.fromCharCode(65+this.sel[i]); Sfx.p('flip'); }
   guess(){ return this.sel.map(v=>String.fromCharCode(65+v)).join(''); }
   ok(){ Sfx.p('press'); if(this.guess()===this.word) this.solve(); else this.strike('morse'); }
@@ -2345,7 +2353,7 @@ ModReg.filemanager = class extends Mod {
     if(bad===0){ this.msg='All files have been verified, and all issues have been fixed.'; this.render(); this.solve(); }
     else {
       this.files.forEach(f=>{ f.loc='F'; f.size=f.orig.size; f.locked=f.orig.locked; });
-      this.view='root'; this.drag=null; this.msg='ผิด ได้รับสไตรค์ — เริ่มใหม่'; this.endDrag(); this.render(); Focus.ensure(); this.strike('fm-check');
+      this.view='root'; this.drag=null; this.msg='Something went wrong. Please try again.'; this.endDrag(); this.render(); Focus.ensure(); this.strike('fm-check');
     }
   }
   info(){ return {target:this.target,folders:this.folders,files:this.files.map(f=>({name:f.name,size:f.size,locked:f.locked,ok:f.ok,exp:this.expected(f)}))}; }
