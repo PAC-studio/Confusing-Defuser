@@ -376,10 +376,10 @@ const NEEDY_INFO = {temperature:{th:'ปรับอุณหภูมิ',tier:
   radio:{th:'ปรับคลื่น',tier:3},switchswap:{th:'สับสวิตช์',tier:4}};
 
 const DIFFS = [
-  {id:'easy',th:'EASY',sub:'ง่าย',color:'#3fcf6a',tpm:105,strikes:4,desc:'สายไฟ · ปุ่มใหญ่ · สวิตช์ไฟ · ทิศทาง'},
-  {id:'medium',th:'MEDIUM',sub:'ปานกลาง',color:'#35b6ff',tpm:100,strikes:3,desc:'+ ปุ่มกดทำซ้ำ · ไบนารี · ปรับค่า'},
+  {id:'easy',th:'EASY',sub:'ง่าย',color:'#3fcf6a',tpm:105,strikes:5,desc:'สายไฟ · ปุ่มใหญ่ · สวิตช์ไฟ · ทิศทาง'},
+  {id:'medium',th:'MEDIUM',sub:'ปานกลาง',color:'#35b6ff',tpm:100,strikes:4,desc:'+ ปุ่มกดทำซ้ำ · ไบนารี · ปรับค่า'},
   {id:'hard',th:'HARD',sub:'ยาก',color:'#ffb62e',tpm:105,strikes:3,desc:'+ อักขระ · เมทริกซ์ · มอร์สโค้ด'},
-  {id:'hardcore',th:'HARDCORE',sub:'โหด',color:'#ff6a2b',tpm:115,strikes:2,desc:'+ ปรับแรงดัน · เส้นทาง · พาสคีย์'},
+  {id:'hardcore',th:'HARDCORE',sub:'โหด',color:'#ff6a2b',tpm:115,strikes:3,desc:'+ ปรับแรงดัน · เส้นทาง · พาสคีย์'},
   {id:'expert',th:'EXPERT',sub:'เซียน',color:'#ff2e4d',tpm:125,strikes:2,desc:'+ ปุ่มซับซ้อน · จัดการไฟล์'}
 ];
 
@@ -625,7 +625,7 @@ const Speak = {
             ['oxford',`https://www.oxfordlearnersdictionaries.com/media/english/us_pron/${lw[0]}/${pad(3)}/${pad(5)}/${lw}__us_1.mp3`]]; },
   _pre:{},
   /* โหลดไฟล์เสียงล่วงหน้าให้เบราว์เซอร์เก็บไว้ (cache) แล้วค่อยเล่นตามที่สุ่มได้ */
-  preload(ws){ (ws||[]).forEach(w=>{ if(this._pre[w]) return; this._pre[w]=this.srcs(w).map(([n,u])=>{ try{ const a=new Audio(); a.preload='auto'; a.src=u; a.load(); return a; }catch(e){ return null; } }); }); },
+  preload(ws,th){ (ws||[]).forEach(w=>{ if(this._pre[w]) return; this._pre[w]=(th?[['g',`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=th&q=${encodeURIComponent(w)}`]]:this.srcs(w)).map(([n,u])=>{ try{ const a=new Audio(); a.preload='auto'; a.src=u; a.load(); return a; }catch(e){ return null; } }); }); },
   tryClip(w,url){
     return new Promise(res=>{
       const a=this.ensurePlayer(); let done=false, started=false; const tok=a._tok=(a._tok||0)+1, mine=()=>a._tok===tok;
@@ -637,9 +637,11 @@ const Speak = {
       try{ a.volume=clamp(Aud.blindVol,0,1); a.src=url; const pr=a.play(); if(pr&&pr.then) pr.then(go,e=>fin(false,(e&&e.name)||'play')); }catch(e){ fin(false,'exception'); }
     });
   },
-  async playWord(w,run){
-    let why=[];
-    for(const [name,u] of this.srcs(w)){
+  async playWord(w,run,opt){
+    opt=opt||{}; let why=[];
+    let list=opt.th?[['google-tr',`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=th&q=${encodeURIComponent(w)}`],['google-tr2',`https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=th&q=${encodeURIComponent(w)}`]]:this.srcs(w);
+    if(opt.only) list=list.filter(x=>opt.only.includes(x[0]));
+    for(const [name,u] of list){
       if(run!==this.wrun) return;
       
       let url=u; if(typeof u==='function'){ try{ url=await u(); }catch(e){ url=null; } } if(!url){ why.push(name+':-'); continue; }
@@ -651,6 +653,7 @@ const Speak = {
     }
     if(run!==this.wrun) return;
     this.setStat(w+': เล่นไม่ได้ ('+why.join(',')+')');
+    if(opt.th) await this.say(w,'th',0.8);
   },
   busy:false,
   async sayWords(ws,gap){ const run=++this.wrun; this.busy=true; for(const w of ws){ if(run!==this.wrun) return; await this.playWord(w,run); await new Promise(r=>setTimeout(r,gap||350)); } if(run===this.wrun) this.busy=false; },
@@ -669,9 +672,9 @@ const BlindSynth = {
       case 'say': {
         let text = m.t, lang = m.l || 'en';
         if(m.d != null){ // ตัวเลข
-          lang = (Speak.digitsLang==='th' && Speak.has('th')) ? 'th' : 'en';
-          if(lang==='en'){ this.lastSay=Speak.playWord(EN_DIGITS[m.d],Speak.wrun); break; }
-          text = TH_DIGITS[m.d]; if(m.d===7&&!m.r) m.r=0.6;
+          lang = Speak.digitsLang==='th' ? 'th' : 'en';
+          if(lang==='en'){ this.lastSay=Speak.playWord(EN_DIGITS[m.d],Speak.wrun,{only:['cambridge']}); break; }
+          this.lastSay=Speak.playWord(TH_DIGITS[m.d],Speak.wrun,{th:true}); break;
         }
         this.lastSay=Speak.say(text, lang, m.r);
         break; }
@@ -679,7 +682,7 @@ const BlindSynth = {
         { const key=(m.w||[]).join(','), now=Date.now(); if(this._lw===key&&(now-this._lwT<500||Speak.busy)){ break; } this._lw=key; this._lwT=now; }
         Speak.cancel(); Speak.sayWords(m.w||[],m.gap);
         break; }
-      case 'pre': Speak.preload(m.w); break;
+      case 'pre': Speak.preload(m.w,m.th); break;
       case 'morse': Aud.resume(); this.morse(m.w, m.u||0.16); break;
       case 'click': {
         const t=Aud.now();
@@ -760,7 +763,7 @@ const Blind = {
   sayWait(d){ const remote=Link.connected(); BlindSynth.lastSay=null; this.send({k:'say',d}); const est=sleep(1600);
     if(remote&&!this.alsoLocal) return est; const l=BlindSynth.lastSay; return l?Promise.all([l,sleep(700)]):est; },
   words(w){ this.send({k:'words',w}); },
-  preload(w){ this.send({k:'pre',w}); },
+  preload(w,th){ this.send({k:'pre',w,th}); },
   morse(w,u){ this.send({k:'morse',w,u}); },
   click(v){ this.send({k:'click',v}); },
   tick(f){ this.send({k:'tick',f}); },
@@ -1421,7 +1424,7 @@ function levelConfig(di, level){
   const needy=R.sample(ntypes,Math.min(ny,ntypes.length));
   const tpm=DIFFS[di].tpm*(1-0.02*(level-1));
   const time=Math.round((90+N*tpm+needy.length*20)/10)*10;
-  let strikes=DIFFS[di].strikes; if(di===4&&level>=8) strikes=1;
+  let strikes=DIFFS[di].strikes;
   return {di,level,diffName:DIFFS[di].th,title:`${DIFFS[di].th} ${level}`,modules:R.shuffle(picks),needy,time,maxStrikes:strikes};
 }
 
@@ -1615,7 +1618,7 @@ ModReg.direction = class extends Mod {
   constructor(b,i,t){
     super(b,i,t);
     this.round=0; this.playing=false; this.startCnt=0; this.inp=0; this.started=false;
-    this.newSeq(); this.build(); Blind.preload(EN_DIGITS);
+    this.newSeq(); this.build(); Blind.preload(EN_DIGITS); Blind.preload(TH_DIGITS,true);
   }
   newSeq(){
     const n=(()=>{ const r=Math.random()*100; return r<15?1:r<40?2:r<70?3:r<90?4:5; })(); this.seq=[]; for(let k=0;k<n;k++){ let ci; do{ ci=R.int(0,3); }while(k&&ci===this.seq[k-1].ci); this.seq.push({ci,d:R.int(0,9)}); }
