@@ -2043,7 +2043,7 @@ ModReg.pressure = class extends Mod {
     this.showP();
   }
   /* ค่าบนจอเปลี่ยนตามการหมุนเสมอ (ขวา=เพิ่ม ซ้าย=ลด) ตรงจุดคลิกจะเป็น P และค้างค่า P ไว้ ±3 สเต็ปให้อ่านง่าย */
-  disp(){ const d=this.dial-this.c, a=Math.abs(d); if(a<=3) return this.P; return clamp(this.P+Math.sign(d)*(a-3)*this.k,0,9999); }
+  disp(){ return this.P+(this.dial-this.c)*this.k; }
   showP(){ const t=this.q('#pdsp'); t.textContent=String(Math.round(this.disp())).padStart(4,' '); t.classList.toggle('noisy',false); }
   release(){
     Sfx.p('press');
