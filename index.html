@@ -1891,7 +1891,7 @@ ModReg.morse = class extends Mod {
     for(let i=0;i<6;i++) this.f(this.q('#mh'+i),'c'+i,{press:()=>this.step(i,1),rotate:d=>this.step(i,d)});
     this.f(this.q('#okh'),'ok',{press:()=>this.ok()});
   }
-  speak(){ Sfx.p('press'); const w=this.q('#spkw'); w.classList.add('wave'); Blind.morse(this.word.toLowerCase(),0.5); this._wv=setTimeout(()=>w.classList.remove('wave'),(this.word.length*16+10)*0.5*1000); }
+  speak(){ Sfx.p('press'); const w=this.q('#spkw'); w.classList.add('wave'); Blind.morse(this.word.toLowerCase(),0.375); this._wv=setTimeout(()=>w.classList.remove('wave'),(this.word.length*16+10)*0.375*1000); }
   step(i,d){ this.sel[i]=(this.sel[i]+d+26)%26; this.q('#ml'+i).textContent=String.fromCharCode(65+this.sel[i]); Sfx.p('flip'); }
   guess(){ return this.sel.map(v=>String.fromCharCode(65+v)).join(''); }
   ok(){ Sfx.p('press'); if(this.guess()===this.word) this.solve(); else this.strike('morse'); }
