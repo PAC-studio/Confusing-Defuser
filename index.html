@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="th"><head><meta charset="utf-8">
+<html lang="th"><head><meta charset="utf-8"><meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
-<title>Confusing Defuser · สับสน งงงวย ช่วยกันกู้ระเบิด</title>
+<title>Confusing Defuser · รวมกันเราอยู่ แยกหมู่เราระเบิด</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap">
 <style>:root{--cell:300px;--fw:900px;--fh:600px;--amber:#ffb02e;--cy:#59e0ff;--bg:#06080a}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
@@ -617,7 +617,7 @@ const Speak = {
   pl:null, wrun:0, wstat:'',
   setStat(t){ this.wstat=t; const e=document.getElementById('pdbg'); if(e) e.textContent=t; },
   /* คำอังกฤษ: ใช้เสียงอ่านจาก Google Translate เท่านั้น (ใช้ <audio> ตัวเดียวที่ปลดล็อกแล้ว เพื่อให้ iOS เล่นได้) */
-  ensurePlayer(){ if(!this.pl){ this.pl=new Audio(); this.pl.setAttribute('playsinline',''); this.pl.preload='auto'; } return this.pl; },
+  ensurePlayer(){ if(!this.pl){ this.pl=new Audio(); this.pl.setAttribute('playsinline',''); this.pl.referrerPolicy='no-referrer'; this.pl.preload='auto'; } return this.pl; },
   /* ลองหลายแหล่งตามลำดับ: เสียงพจนานุกรมของ Google (ไฟล์สถิตบน gstatic) -> Google Translate TTS -> เสียงอ่านของเครื่อง */
   good:(()=>{ try{ return JSON.parse(localStorage.getItem('bd_good')||'{}'); }catch(e){ return {}; } })(),
   srcs(w){ const lw=w.toLowerCase(), pad=(n)=>(lw.slice(0,n)+'_____').slice(0,n);
@@ -626,11 +626,11 @@ const Speak = {
   _pre:{},
   /* โหลดไฟล์เสียงล่วงหน้าให้เบราว์เซอร์เก็บไว้ (cache) แล้วค่อยเล่นตามที่สุ่มได้ */
   preload(ws,th){ (ws||[]).forEach(w=>{ if(this._pre[w]) return; this._pre[w]=(th?[['g',`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=th&q=${encodeURIComponent(w)}`]]:this.srcs(w)).map(([n,u])=>{ try{ const a=new Audio(); a.preload='auto'; a.src=u; a.load(); return a; }catch(e){ return null; } }); }); },
-  tryClip(w,url){
+  tryClip(w,url,tmo){
     return new Promise(res=>{
       const a=this.ensurePlayer(); let done=false, started=false; const tok=a._tok=(a._tok||0)+1, mine=()=>a._tok===tok;
       const fin=(ok,why)=>{ if(done) return; done=true; clearTimeout(to); if(mine()){ a.onended=a.onerror=a.onplaying=null; } res({ok,why}); };
-      const to=setTimeout(()=>fin(false,'timeout'),5000);
+      const to=setTimeout(()=>fin(false,'timeout'),tmo||5000);
       a.onerror=()=>fin(started,'error '+(a.error&&a.error.code||''));
       const go=()=>{ if(started||!mine()) return; started=true; clearTimeout(to); a.onended=()=>fin(true); setTimeout(()=>fin(true),3500); };
       a.onplaying=go;
@@ -639,13 +639,17 @@ const Speak = {
   },
   async playWord(w,run,opt){
     opt=opt||{}; let why=[];
-    let list=opt.th?[['google-tr',`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=th&q=${encodeURIComponent(w)}`],['google-tr2',`https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=th&q=${encodeURIComponent(w)}`]]:this.srcs(w);
+    const q=encodeURIComponent(w);
+    let list=opt.th?[['g1',`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=th&q=${q}`],
+      ['g2',`https://translate.google.com/translate_tts?ie=UTF-8&q=${q}&tl=th&total=1&idx=0&textlen=${w.length}&client=tw-ob&prev=input`],
+      ['g3',`https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=th&q=${q}`],
+      ['g4',`https://translate.google.com.vn/translate_tts?ie=UTF-8&client=tw-ob&tl=th&q=${q}`]]:this.srcs(w);
     if(opt.only) list=list.filter(x=>opt.only.includes(x[0]));
     for(const [name,u] of list){
       if(run!==this.wrun) return;
       
       let url=u; if(typeof u==='function'){ try{ url=await u(); }catch(e){ url=null; } } if(!url){ why.push(name+':-'); continue; }
-      let r=await this.tryClip(w,url);
+      let r=await this.tryClip(w,url,opt.th?2500:0);
       if(run!==this.wrun) return;
       if(!r.ok&&r.why==='AbortError'){ r=await this.tryClip(w,url); if(run!==this.wrun) return; }
       if(r.ok){ this.setStat('เล่นคำ: '+w+' ✓'); this.good[w.toLowerCase()]=name; try{ localStorage.setItem('bd_good',JSON.stringify(this.good)); }catch(e){} return; }
@@ -653,7 +657,7 @@ const Speak = {
     }
     if(run!==this.wrun) return;
     this.setStat(w+': เล่นไม่ได้ ('+why.join(',')+')');
-    if(opt.th) await this.say(w,'th',0.8);
+    if(opt.th){ this.setStat(w+': Google ไม่ได้ ('+why.join(',')+') ใช้เสียงเครื่อง'); await this.say(w,'th',0.8); }
   },
   busy:false,
   async sayWords(ws,gap){ const run=++this.wrun; this.busy=true; for(const w of ws){ if(run!==this.wrun) return; await this.playWord(w,run); await new Promise(r=>setTimeout(r,gap||350)); } if(run===this.wrun) this.busy=false; },
@@ -2008,8 +2012,13 @@ ModReg.pressure = class extends Mod {
       if(big){ const rt=r-12.5; o+=`<text x="${cx+rt*Math.cos(a)}" y="${cy+rt*Math.sin(a)+2}" font-family="Courier New,Courier,Kanit,monospace" font-weight="700" font-size="5.4" fill="#e6e9ec" text-anchor="middle">${v}</text>`; } }
     o+=`<g id="knob"><circle cx="${cx}" cy="${cy}" r="7.4" fill="url(#gSteel)" stroke="#000" stroke-width=".7"/><path d="M${cx},${cy-7} L${cx+2.2},${cy-r+3.5} L${cx-2.2},${cy-r+3.5}Z" fill="#ff5a2a"/><circle cx="${cx}" cy="${cy}" r="2.6" fill="#2a2d31"/></g><circle id="dh" cx="${cx}" cy="${cy}" r="${r}" fill="transparent"/>`;
     // หลอดแก๊ส
-    o+=`<rect x="82" y="7" width="13" height="70" rx="6" fill="#0a0e10" stroke="#8aa" stroke-width=".9"/><clipPath id="tc${this.idx}"><rect x="83.3" y="8.3" width="10.4" height="67.4" rx="5"/></clipPath><g clip-path="url(#tc${this.idx})"><rect id="gas" class="gasbar" x="83" y="8" width="11" height="68"/></g><rect x="84.4" y="9" width="2.2" height="64" rx="1" fill="#fff" opacity=".25"/>`;
-    for(let k=0;k<=this.gmax;k++) o+=`<line x1="95" y1="${8+k*(68/this.gmax)}" x2="98" y2="${8+k*(68/this.gmax)}" stroke="#aaa" stroke-width=".5"/>`;
+    const gid=`gt${this.idx}`;
+    o+=`<defs><linearGradient id="${gid}" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".55"/><stop offset=".3" stop-color="#fff" stop-opacity=".28"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></linearGradient></defs>`;
+    o+=`<rect x="81" y="6" width="15" height="72" rx="6.5" fill="#0a0e10" stroke="#9db" stroke-width=".9"/><clipPath id="tc${this.idx}"><rect x="82.6" y="7.6" width="11.8" height="68.8" rx="5.5"/></clipPath><g clip-path="url(#tc${this.idx})"><rect id="gas" class="gasbar" x="82" y="8" width="13" height="68"/>`;
+    for(const [bx,by,br] of [[85,60,.9],[90,48,.7],[87,34,1],[91,22,.6],[86,14,.7],[90,66,.8]]) o+=`<circle cx="${bx}" cy="${by}" r="${br}" fill="#fff" opacity=".18"/>`;
+    o+=`<rect x="82" y="8" width="13" height="68" fill="url(#${gid})" pointer-events="none"/></g><rect x="84" y="9.5" width="2" height="63" rx="1" fill="#fff" opacity=".35"/><rect x="91.2" y="12" width=".9" height="56" rx=".45" fill="#fff" opacity=".12"/>`;
+    o+=`<rect x="80.2" y="3.6" width="16.6" height="5" rx="2" fill="url(#gSteel)" stroke="#111" stroke-width=".5"/><rect x="80.2" y="75" width="16.6" height="5" rx="2" fill="url(#gSteel)" stroke="#111" stroke-width=".5"/>`;
+    for(let k=0;k<=this.gmax;k++){ const yy=8+k*(68/this.gmax); o+=`<line x1="96.4" y1="${yy}" x2="99" y2="${yy}" stroke="#bbb" stroke-width=".5"/>`; }
     o+=`<rect x="18" y="85" width="64" height="11" rx="3" fill="url(#gb-red)" stroke="#111" stroke-width=".6"/><text x="50" y="92.8" class="btxt" font-size="6" fill="#fff" pointer-events="none">ระบายแก๊ส</text><rect id="rh" x="18" y="85" width="64" height="11" fill="transparent"/>`;
     o+=this.progMarkup(7,50,98.6,5.6,1.5);
     this.svg(o);
@@ -2656,7 +2665,7 @@ const Game = {
   },
   s_title(el){
     const pad=Input.padConnected;
-    el.innerHTML=`<div class="logo">CONFUSING<br>DEFUSER<small>สับสน งงงวย ช่วยกันกู้ระเบิด</small></div><div class="tagline">3 คน · 1 ระเบิด · ไม่มีใครทำงานครบทุกประสาท</div><div class="menu"></div>
+    el.innerHTML=`<div class="logo">CONFUSING<br>DEFUSER<small>รวมกันเราอยู่ แยกหมู่เราระเบิด</small></div><div class="tagline">3 คน · 1 ระเบิด · ไม่มีใครทำงานครบทุกประสาท</div><div class="menu"></div>
       <div class="hint">${pad?'🎮 ตรวจพบจอยแล้ว':'ยังไม่พบจอย — ใช้คีย์บอร์ด/สัมผัสแทนได้'} &nbsp; <b>A</b> เลือก &nbsp;<b>B</b> ย้อน</div>`;
     const m=$('.menu',el);
     m.append(this.btn('▶ เริ่มเกม',()=>this.go('diff'),'primary','start'),this.btn('🎧 เชื่อมต่อโทรศัพท์ (เสียงคนตาบอด)',()=>this.go('setup'),'','setup'),
